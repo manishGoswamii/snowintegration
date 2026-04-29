@@ -491,6 +491,55 @@ app.post("/nlp", nlpUpload.single("file"), async (req, res) => {
     }
 });
 
+app.post("/nlpV2", async (req, res) => {
+    try {
+
+        const requirements = req.body.requirements;
+
+        if (!requirements || !requirements.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: "No requirements provided"
+            });
+        }
+
+        // Clean input text
+        const cleanRequirements = requirements
+            .replace(/\s+/g, " ")
+            .trim();
+
+        // Strong structured prompt
+        const apiPrompt = prompt + ". Requirements: " + cleanRequirements;
+
+        const aiResponse = await callHuggingFace(apiPrompt);
+
+        let parsedOutput;
+
+        try {
+            parsedOutput = JSON.parse(aiResponse.content);
+        } catch (e) {
+            return res.status(500).json({
+                success: false,
+                message: "AI returned invalid JSON",
+                rawOutput: aiResponse.content
+            });
+        }
+
+        return res.json({
+            success: true,
+            aiGeneratedWorkflow: parsedOutput
+        });
+
+    } catch (error) {
+        console.error(error);
+
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 // Health check
 app.get("/health", (req, res) => {
     res.json({
