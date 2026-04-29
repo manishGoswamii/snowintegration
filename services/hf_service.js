@@ -1,4 +1,3 @@
-const HF_TOKEN = "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";
 import { OpenAI } from "openai";
 import { configDotenv } from "dotenv";
 
