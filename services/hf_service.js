@@ -3,7 +3,7 @@ import { OpenAI } from "openai";
 import { configDotenv } from "dotenv";
 
 configDotenv();
-const apiKey = process.env.API_KEY;
+const apiKey = process.env.OPENAI_API_KEY;
 export async function callHuggingFace(prompt)
 {
 
