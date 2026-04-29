@@ -1,11 +1,15 @@
 const HF_TOKEN = "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";
 import { OpenAI } from "openai";
+import { configDotenv } from "dotenv";
+
+configDotenv();
+const apiKey = process.env.API_KEY;
 export async function callHuggingFace(prompt)
 {
 
     const client = new OpenAI({
         baseURL: "https://router.huggingface.co/v1",
-        apiKey: HF_TOKEN,
+        apiKey,
     });
     
     const chatCompletion = await client.chat.completions.create({
