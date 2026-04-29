@@ -7,12 +7,13 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev":"node index.js"
+    "dev": "node index.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "multer": "^2.1.1",
+    "openai": "^6.35.0",
     "xlsx": "^0.18.5"
   }
 }
