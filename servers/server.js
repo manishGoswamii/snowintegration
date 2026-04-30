@@ -417,9 +417,6 @@ app.post("/upload-excel", upload.single("file"), async (req, res) => {
     }
 });
 
-
-
-
 const nlpUpload = multer({
     storage,
     fileFilter: (req, file, cb) => {
@@ -499,7 +496,8 @@ app.post("/nlpV2", async (req, res) => {
         if (!requirements || !requirements.trim()) {
             return res.status(400).json({
                 success: false,
-                message: "No requirements provided"
+                message: "No requirements provided",
+                error:true
             });
         }
 
@@ -520,14 +518,27 @@ app.post("/nlpV2", async (req, res) => {
         } catch (e) {
             return res.status(500).json({
                 success: false,
-                message: "AI returned invalid JSON",
-                rawOutput: aiResponse.content
+                error:true,
+                message:  parsedOutput.reason || parsedOutput.message ,
+                status:500
             });
         }
 
-        return res.json({
-            success: true,
-            aiGeneratedWorkflow: parsedOutput
+        if(parsedOutput.isValid){
+            return res.status(200).json({
+                success: true,
+                error:false,
+                content: parsedOutput.content,
+                message:  parsedOutput.reason || parsedOutput.message ,
+                status:200
+            });
+        }
+        return res.status(400).json({
+            success: false,
+            error:true,
+            content:parsedOutput.content,
+            message:  parsedOutput.reason || parsedOutput.message ,
+            status:400
         });
 
     } catch (error) {
@@ -535,7 +546,9 @@ app.post("/nlpV2", async (req, res) => {
 
         return res.status(500).json({
             success: false,
-            message: error.message
+            error:true,
+            message: error.message,
+            status:500
         });
     }
 });
@@ -543,6 +556,7 @@ app.post("/nlpV2", async (req, res) => {
 // Health check
 app.get("/health", (req, res) => {
     res.json({
+        error:false,
         success: true,
         message: "Excel parser service is running"
     });
