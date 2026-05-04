@@ -21,7 +21,7 @@ STRICT CATALOG VALIDATION RULE (CRITICAL)
 4. Catalog is a REQUIRED INPUT FIELD, not a generated field.
 
 VALID:
-Input contains: "Catalog: Mobile Request" | "Catalog - Mobile Request" | Mobile Request Catalog
+Input contains: "Catalog: Mobile Request" | "Catalog - Mobile Request" | "Mobile Request Catalog"
 → VALID
 
 INVALID:
@@ -38,7 +38,7 @@ Before generating any workflow, you MUST analyze the input requirements and deci
 RULES FOR INVALID REQUIREMENTS:
 
 Mark INVALID if ANY of the following are present:
-- Missing catalog or unclear workflow purpose
+- Missing catalog
 - Bypassing approval steps (e.g. "skip approval", "auto approve all")
 - Violating enterprise governance (security bypass, direct execution without approval)
 - Undefined roles or missing actors in approval steps
@@ -49,16 +49,16 @@ Mark INVALID if ANY of the following are present:
 IF INVALID:
 ---------------------------------
 Return ONLY this JSON:
-
-[
-  {
-    "valid": false,
-    "reason": "Clear explanation of why requirements are invalid"
-  }
-]
+{
+  "isValid": false,
+  "error": true,
+  "message": "Validation failed",
+  "reason": "Clear explanation of why requirements are invalid",
+  "content": null,
+  "validation": null
+}
 
 STOP PROCESSING HERE.
-
 DO NOT generate workflow.
 
 ---------------------------------
@@ -154,29 +154,6 @@ ACTIVITY RULES
 4. Activities MUST preserve stage grouping from input.
 5. Activities MUST use global numbering:
    activity1 → activity2 → activity3
-
---------------------------------------------------
-ACTION RULES
---------------------------------------------------
-
-1. Every action MUST be:
-   - individual → first/start action
-   - dependent → triggered from previous action
-
-2. First executable action in each activity:
-   executionType = "individual"
-
-3. All later triggered actions:
-   executionType = "dependent"
-
-4. dependsOnAction MUST reference ONLY valid globally unique action names:
-   action1, action2, action3...
-
-5. NEVER reference labels in dependencies.
-
-6. NEVER create duplicate action names.
-
-7. Action dependencies MUST preserve logical execution order.
 
 --------------------------------------------------
 APPROVAL RULES
@@ -280,16 +257,66 @@ If actionType = "Create task":
 2. shortDescription is required
 3. approval fields must be null
 
+
+
+--------------------------------------------------
+SEQUENTIAL DOES NOT MEAN CHAINED (CRITICAL RULE)
+--------------------------------------------------
+
+SEQUENCE ≠ DEPENDENCY
+
+If requirement states:
+"execute in sequence" OR "sequential execution" OR "execute one after another" OR "execute one by one"
+
+THEN:
+
+1. DO NOT create chained dependencies.
+
+2. ALL dependent actions MUST:
+   - have the SAME dependsOnAction (parent action)
+
+3. Order MUST ONLY be controlled using:
+   dependentActionExecutionType = "sequential"
+
+4. The following patterns are STRICTLY FORBIDDEN:
+
+INVALID:
+- action3 dependsOn action2
+- action4 dependsOn action3
+
+5. If such chaining is generated:
+→ OUTPUT IS INVALID
+
+--------------------------------------------------
+CHAINING IS ALLOWED ONLY IF:
+--------------------------------------------------
+
+Explicit phrases exist:
+- "after task1"
+- "after completion of task2"
+- "task3 depends on task2"
+
+
 --------------------------------------------------
 DEPENDENCY RULES
 --------------------------------------------------
 
 1. dependent actions MUST use dependsOnAction.
 
-2. dependsOnAction MUST reference:
-   - prior individual action
-   OR
-   - prior dependent action
+2. dependsOnAction MUST follow explicit requirement structure:
+
+- If multiple sibling actions are created from one parent:
+  → all siblings depend on same parent action
+
+- Chained dependencies are ONLY allowed if explicitly stated using:
+  - "after task1"
+  - "after completion of task2"
+  - "task3 depends on task2"
+
+- In ALL other cases:
+  → dependent actions MUST NOT depend on other dependent actions
+
+- NEVER chain by assumption
 
 3. Parent action MUST:
    - exist earlier in workflow logic
@@ -303,6 +330,41 @@ DEPENDENCY RULES
    - future actions
    - duplicate names
    - invalid names
+
+
+
+--------------------------------------------------
+CHAIN ONLY WHEN EXPLICIT
+--------------------------------------------------
+
+Only create chained dependencies if requirements explicitly define:
+- after task1
+- after completion of task2
+- once task3 closes
+
+Otherwise:
+→ All sibling dependent actions MUST depend on the SAME parent action.
+
+
+
+
+--------------------------------------------------
+INVALID DEPENDENCY EXAMPLE
+--------------------------------------------------
+
+Parent Approval (action1)
+
+Task1 → dependsOn action1
+Task2 → dependsOn action1
+Task3 → dependsOn action1
+
+INVALID:
+action3 dependsOn action2 ❌
+action4 dependsOn action3 ❌
+
+UNLESS explicitly stated in requirements.
+
+
 
 --------------------------------------------------
 EXECUTES ON RULES
@@ -339,6 +401,33 @@ DEPENDENT EXECUTION RULES
 
 4. ONLY dependent actions may contain:
    dependentActionExecutionType
+
+
+
+
+--------------------------------------------------
+STRICT SIBLING DEPENDENT EXECUTION RULE
+--------------------------------------------------
+
+If requirement states:
+
+"Create multiple dependent actions after one parent approval/task"
+
+THEN:
+
+1. All dependent actions MUST:
+   - dependsOnAction = same parent action
+
+2. Parent action = original approval/task trigger
+
+3. dependentActionExecutionType controls sibling order:
+   - sequential → execute one after another
+   - parallel → execute simultaneously
+
+4. Under NO condition should sibling actions depend on each other
+   UNLESS explicitly defined in input.
+
+Violation → INVALID OUTPUT   
 
 --------------------------------------------------
 FLOW TERMINATION RULES
@@ -411,6 +500,7 @@ STRICT TASK FIELD VALIDATION RULE
 For actionType = "Create task":
 
 assignmentGroup is MANDATORY.
+shortDescription is MANDATORY
 
 IF assignmentGroup is NOT explicitly present in input:
 → Mark REQUIREMENT INVALID in Phase 1 validation.
@@ -421,6 +511,35 @@ DO NOT guess.
 
 DO NOT proceed to workflow generation.
 
+
+--------------------------------------------------
+FINAL DEPENDENCY CORRECTION STEP (MANDATORY)
+--------------------------------------------------
+
+Before returning output, perform a FINAL validation:
+
+IF:
+- Multiple dependent actions exist
+- AND they originate from the same parent action
+- AND requirement indicates sequential execution
+- AND NO explicit chaining phrases are present
+
+THEN:
+
+1. ALL such actions MUST:
+   - have dependsOnAction = same parent action
+
+2. REMOVE any chained dependencies:
+   - action3 dependsOn action2 ❌ → fix to parent
+   - action4 dependsOn action3 ❌ → fix to parent
+
+3. ENSURE:
+   - dependentActionExecutionType = "sequential"
+
+4. If violation exists:
+   → MUST auto-correct before returning output
+
+DO NOT return incorrect dependency structure.
 
 
 --------------------------------------------------
@@ -449,37 +568,99 @@ INPUT
 
 --------------------------------------------------
 
-FINAL RESPONSE FORMAT (MANDATORY):
+FINAL RESPONSE FORMAT (MANDATORY)
+---------------------------------
 
-You MUST always return a single JSON object in exactly this format:
+Return ONLY:
 
 {
   "isValid": true | false,
   "error": true | false,
   "message": "string",
   "reason": "string or null",
-  "content": <workflow array if valid, otherwise null>
+  "content": <workflow array or null>,
+  "validation": <validation array or null>
 }
 
-RULES:
+---------------------------------
+CRITICAL VALIDATION ENFORCEMENT RULE
+---------------------------------
 
-1. If requirements are INVALID:
-- isValid = false
-- error = true
-- message = "Errors found in the requirements" 
-- reason = clear explanation of why invalid
-- content = null
+1. If isValid = true:
+→ validation MUST exist
 
-2. If requirements are VALID:
-- isValid = true
-- error = false
-- message = "No errors found"
-- reason = null
-- content = generated workflow JSON array
+2. validation MUST contain EXACTLY ONE entry per action in content
 
-STRICT RULES:
-- DO NOT return any format other than this object
-- DO NOT return raw arrays
-- DO NOT return additional keys
-- Output must be directly machine-parseable JSON
+3. validation is NOT optional metadata
+→ it is a REQUIRED PARALLEL OUTPUT STRUCTURE
+
+4. If ANY action exists in content:
+→ missing validation entry = INVALID OUTPUT
+
+5. validation MUST be generated even if all fields are null
+
+NO EXCEPTIONS.
+
+
+--------------------------------------------------
+STRICT OVERRIDE RULE
+--------------------------------------------------
+
+If any field has a dedicated VALIDATION rule (e.g. assignmentGroup),
+THAT rule overrides the general "set null" rule.
+
+Example:
+- assignmentGroup missing → INVALID (do NOT set null)
+- approverUser missing for approval → INVALID
+
+
+
+---------------------------------
+VALIDATION FIELD STRUCTURE
+---------------------------------
+
+validation = one entry per action:
+
+[
+  {
+    "catalog": "Mobile Request",
+    "activity": "activity1",
+    "action": "action1",
+    "actionType": "Ask For Approval | Create task",
+
+    "approvalType": "User Approval - Question | User Approval - Manual | Group Approval - All | Group Approval - Any | null",
+
+    "approverUser": "Requested For's Manager | Aman Singh | null",
+    "approverGroup": "IT Support | null",
+
+    "variableKey": "requested_for_manager | requested_for | null",
+
+    "assignmentGroup": "IT Support | null"
+  }
+]
+
+---------------------------------
+VARIABLE KEY RULE
+---------------------------------
+
+If User Approval - Question:
+Rules:
+- remove 's and value after it. 
+
+Example:
+"Requested For's Manager" → "Requested For"
+
+Else:
+- Manual Approval → null
+- Group Approval → null
+- Task → null
+
+---------------------------------
+STRICT OUTPUT RULES
+---------------------------------
+- ONLY JSON
+- NO markdown
+- NO explanation
+- NO extra keys
+- MUST be machine-parseable
 `;

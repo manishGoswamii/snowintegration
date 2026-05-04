@@ -5,7 +5,7 @@ import { join, extname } from "path";
 import { existsSync, mkdirSync } from "fs";
 import cors from "cors";
 import path from "path";
-import { callHuggingFace } from "../services/hf_service.js";
+import { callHuggingFace, callHuggingFaceV2 } from "../services/hf_service.js";
 import fs from "fs/promises";
 
 import {prompt} from "../prompt.js"; 
@@ -552,6 +552,84 @@ app.post("/nlpV2", async (req, res) => {
         });
     }
 });
+
+app.post("/nlpV3", async (req, res) => {
+    try {
+
+        const requirements = req.body.requirements;
+
+        if (!requirements || !requirements.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: "No requirements provided",
+                error:true
+            });
+        }
+
+        // Clean input text
+        const cleanRequirements = requirements
+            .replace(/\s+/g, " ")
+            .trim();
+
+        // Strong structured prompt
+        const apiPrompt = prompt + ". Requirements: " + cleanRequirements;
+
+        		// Call Hugging Face correctly
+		const aiResponse = await callHuggingFaceV2({
+			model: "Qwen/Qwen3.5-9B:together",
+			messages: [
+				{
+					role: "user",
+					content: apiPrompt,
+				},
+			],
+		});
+        
+        console.log(aiResponse);
+        let parsedOutput;
+
+        try {
+            parsedOutput = JSON.parse(aiResponse.content);
+        } catch (e) {
+            return res.status(500).json({
+                success: false,
+                error:true,
+                message:  parsedOutput.reason || parsedOutput.message ,
+                status:500
+            });
+        }
+
+        if(parsedOutput.isValid){
+            return res.status(200).json({
+                success: true,
+                error:false,
+                content: parsedOutput.content,
+                message:  parsedOutput.reason || parsedOutput.message ,
+                status:200
+            });
+        }
+        return res.status(400).json({
+            success: false,
+            error:true,
+            content:parsedOutput.content,
+            message:  parsedOutput.reason || parsedOutput.message ,
+            status:400
+        });
+
+    } catch (error) {
+        console.error(error);
+
+        return res.status(500).json({
+            success: false,
+            error:true,
+            message: error.message,
+            status:500
+        });
+    }
+});
+
+
+
 
 // Health check
 app.get("/health", (req, res) => {
