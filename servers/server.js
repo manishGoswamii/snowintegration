@@ -58,28 +58,7 @@ function parseExcel(filePath) {
 
 // Upload endpoint
 app.post("/upload-excel", upload.single("file"), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: "No file uploaded"
-            });
-        }
-
-        const filePath = req.file.path;
-
-        const normalizeRow = (row) => {
-            const cleaned = {};
-            Object.keys(row).forEach(key => {
-                const cleanedKey = key.trim().toLowerCase();
-                const value = (row[key] && row[key].trim().toLowerCase()) || "";
-                cleaned[cleanedKey] = value;
-            });
-
-            return cleaned;
-        }
-
-        const validateStructure = (rows) => {
+    const validateExcelFileStructure = (rows) => {
             const errors = [];
             const actionNames = new Set();
 
@@ -204,9 +183,9 @@ app.post("/upload-excel", upload.single("file"), async (req, res) => {
                         errors.push(`Row ${rowNum}: Dependent Action Execution Mode is required.`);
                     }
 
-                    if (!row["execution order"]) {
-                        errors.push(`Row ${rowNum}: Execution Order is required.`);
-                    }
+                    // if (!row["execution order"]) {
+                    //     errors.push(`Row ${rowNum}: Execution Order is required.`);
+                    // }
                 }
             });
 
@@ -354,60 +333,80 @@ app.post("/upload-excel", upload.single("file"), async (req, res) => {
                 isValid: false,
                 errors
             };
-        };
+    };
+
+    const createDataValidationPayload = (row, index) => {
+        const obj = {};
+        obj.rowNumber = index + 1;
+        obj.catalogName = row["catalog item"];
+        obj.activityName = row["activity name"];
+        obj.actionName = row["action name"];
+        obj.actionType = row["action type"];
+        obj.actionExecutionType = row["action execution type"];
+        if (row["action type"] == "ask for approval") {
+            obj.approvalType = row["approval type"];
+            if (row["approval type"] == "user approval - question" || row["approval type"] == "user approval - name") {
+                obj.approverUser = row["approver user"];
+            }
+            else {
+                obj.approverGroup = row["approver group"];
+            }
+        }
+        else if (row["action type"] == "create task") {
+            obj.assignmentGroup = row["task assignment group"];
+            obj.shortDescription = row["short description"];
+        }
+        if (row["action execution type"] == "dependent") {
+            obj.dependsOnAction = row["depends on action"];
+            obj.dependentActionExecutionMode = row["dependent action execution mode"];
+            obj.dependentActionExecutionOrder = row["execution order"];
+        }
+        return obj;
+    }
+
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "No file uploaded"
+            });
+        }
+
+        const filePath = req.file.path;
+
+        const normalizeRow = (row) => {
+            const cleaned = {};
+            Object.keys(row).forEach(key => {
+                const cleanedKey = key.trim().toLowerCase();
+                const value = (row[key] && row[key].trim().toLowerCase()) || "";
+                cleaned[cleanedKey] = value;
+            });
+
+            return cleaned;
+        }
 
         const rows = parseExcel(filePath).map(normalizeRow);
 
-        const validation = validateStructure(rows); 
+        const validation = validateExcelFileStructure(rows); 
 
         if(!validation.isValid){
             return res.status(400).json({
             success: false,
-            error:"Excel file contains errors",
-            message:validation.errors
-        });
+            message:`Excel file contains ${validation.errors.length} errors.`,
+            errors:validation.errors
+          });
         }
 
         // Validation payload extraction example
-        const validationPayload = rows.map((row, index) => {
+        const validationPayload = rows.map(createDataValidationPayload);
 
-            const obj = {};
-            obj.rowNumber = index + 1;
-            obj.catalogName = row["catalog item"];
-            obj.activityName = row["activity name"];
-            obj.actionName = row["action name"];
-            obj.actionType = row["action type"];
-            obj.actionExecutionType = row["action execution type"];
-            if (row["action type"] == "ask for approval") {
-                obj.approvalType = row["approval type"];
-                if (row["approval type"] == "user approval - question" || row["approval type"] == "user approval - name") {
-                    obj.approverUser = row["approver user"];
-                }
-                else {
-                    obj.approverGroup = row["approver group"];
-                }
-            }
-            else if (row["action type"] == "create task") {
-                obj.assignmentGroup = row["task assignment group"];
-                obj.shortDescription = row["short description"];
-            }
-            if (row["action execution type"] == "dependent") {
-                obj.dependsOnAction = row["depends on action"];
-                obj.dependentActionExecutionMode = row["dependent action execution mode"];
-                obj.dependentActionExecutionOrder = row["execution order"];
-            }
-            return obj;
-        });
-
-
-        return res.json({
+        return res.status(200).json({
             success: true,
             fileName: req.file.originalname,
             totalRows: rows.length,
             rawRows: rows,
             validationPayload
         });
-
     } catch (error) {
         console.error(error);
         return res.status(500).json({
@@ -553,6 +552,8 @@ app.post("/nlpV2", async (req, res) => {
     }
 });
 
+
+/*
 app.post("/nlpV3", async (req, res) => {
     try {
 
@@ -627,7 +628,7 @@ app.post("/nlpV3", async (req, res) => {
         });
     }
 });
-
+*/
 
 
 
