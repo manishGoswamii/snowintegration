@@ -1,0 +1,10 @@
+Catalog - Mobile Service Connections
+Activity 1:
+
+Ask for approval from Requested For’s Manager.
+If approved, create three dependent tasks that must execute in sequence:
+Task1 assigned to Network group with short description "Check network".
+Task2 assigned to Database group with short description "Check database".
+Task3 assigned to NY DB group with short description "Do something".
+If approval is rejected, end the workflow.
+If any task is marked Closed Incomplete, end the workflow.

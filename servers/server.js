@@ -514,18 +514,22 @@ app.post("/nlp", nlpUpload.single("file"), async (req, res) => {
 
         // Hugging Face call
         const aiResponse = await callHuggingFace(apiPrompt);
-        return res.json({
-            success: true,
+        const parsedResponse = await JSON.parse(aiResponse.content);
+        console.log(parsedResponse);
+        return res.status(200).json({
+            success:true,
+            error: parsedResponse.error,
+            message:parsedResponse.message,
             fileName: req.file.originalname,
-            aiGeneratedWorkflow: JSON.parse(aiResponse.content)
+            validationPayload:parsedResponse.validation,
+            rows:parsedResponse.content,
         });
 
     } catch (error) {
         console.error(error);
-
         return res.status(500).json({
             success: false,
-            message: error.message
+            message: aiResponse.message
         });
     }
 });
