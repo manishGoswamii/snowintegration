@@ -338,7 +338,7 @@ app.post("/upload-excel", upload.single("file"), async (req, res) => {
     const createDataValidationPayload = (row, index) => {
         const obj = {};
         obj.rowNumber = index + 1;
-        obj.catalogName = row["catalog item"];
+        obj.catalog = row["catalog item"];
         obj.activityName = row["activity name"];
         obj.actionName = row["action name"];
         obj.actionType = row["action type"];

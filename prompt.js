@@ -627,7 +627,7 @@ validation = one entry per action:
     "activity": "activity1",
     "action": "action1",
     "actionType": "Ask For Approval | Create task",
-
+    "rowNumber":  Starting from 1 to n, representing unqiue row
     "approvalType": "User Approval - Question | User Approval - Manual | Group Approval - All | Group Approval - Any | null",
 
     "approverUser": "Requested For's Manager | Aman Singh | null",
